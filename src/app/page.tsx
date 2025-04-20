@@ -3,12 +3,9 @@ import { useEffect, useState } from "react";
 import { ProfileCard } from "@/components/ProfileCard";
 import { ProfileWithPicture } from "@/types/profile";
 import { Button } from "@/components/ui/button";
-import { apiRequest } from "@/lib/axios";
 import { profilesService } from "@/services/profiles.service";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
-
-const ITEMS_PER_PAGE = 20;
 
 function Pagination({
   currentPage,
