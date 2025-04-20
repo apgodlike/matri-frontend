@@ -72,6 +72,7 @@ function Pagination({
           </Button>
         )
       )}
+
       <Button
         variant="outline"
         onClick={() => onPageChange(currentPage + 1)}
