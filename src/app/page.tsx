@@ -2,93 +2,18 @@
 import { useEffect, useState } from "react";
 import { ProfileCard } from "@/components/ProfileCard";
 import { ProfileWithPicture } from "@/types/profile";
-import { Button } from "@/components/ui/button";
 import { profilesService } from "@/services/profiles.service";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
-
-function Pagination({
-  currentPage,
-  totalPages,
-  onPageChange,
-}: {
-  currentPage: number;
-  totalPages: number;
-  onPageChange: (page: number) => void;
-}) {
-  const getPageNumbers = () => {
-    const delta = 2;
-    const range = [];
-    const rangeWithDots = [];
-
-    for (
-      let i = Math.max(2, currentPage - delta);
-      i <= Math.min(totalPages - 1, currentPage + delta);
-      i++
-    ) {
-      range.push(i);
-    }
-
-    if (currentPage - delta > 2) {
-      rangeWithDots.push(1, "...");
-    } else {
-      rangeWithDots.push(1);
-    }
-
-    rangeWithDots.push(...range);
-
-    if (currentPage + delta < totalPages - 1) {
-      rangeWithDots.push("...", totalPages);
-    } else if (totalPages > 1) {
-      rangeWithDots.push(totalPages);
-    }
-
-    return rangeWithDots;
-  };
-
-  return (
-    <div className="flex justify-center gap-1 mt-6 flex-wrap">
-      <Button
-        variant="outline"
-        onClick={() => onPageChange(currentPage - 1)}
-        disabled={currentPage === 1}
-        className="hidden sm:inline-flex"
-      >
-        Previous
-      </Button>
-      {getPageNumbers().map((pageNumber, i) =>
-        pageNumber === "..." ? (
-          <span key={`dots-${i}`} className="px-3 py-2">
-            ...
-          </span>
-        ) : (
-          <Button
-            key={pageNumber}
-            variant={currentPage === pageNumber ? "default" : "outline"}
-            onClick={() => onPageChange(pageNumber as number)}
-            className="w-10 h-10 p-0"
-          >
-            {pageNumber}
-          </Button>
-        )
-      )}
-
-      <Button
-        variant="outline"
-        onClick={() => onPageChange(currentPage + 1)}
-        disabled={currentPage === totalPages}
-        className="hidden sm:inline-flex"
-      >
-        Next
-      </Button>
-    </div>
-  );
-}
+import Pagination from "@/components/Pagination";
 
 export default function Home() {
   const [profiles, setProfiles] = useState<ProfileWithPicture[]>([]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(0);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [displayedProfiles, setDisplayedProfiles] = useState<
+    ProfileWithPicture[]
+  >([]);
+  const [totalPages, setTotalPages] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
   const [showOnlyVisible, setShowOnlyVisible] = useState(false);
   const [locationFilter, setLocationFilter] = useState("");
@@ -101,6 +26,14 @@ export default function Home() {
           await profilesService.getAllProfiles(currentPage);
         setProfiles(fetchedProfiles);
         setTotalPages(totalPages);
+        setIsLoading(false);
+        if (totalPages > 1) {
+          for (let i = 2; i < totalPages; i++) {
+            const { profiles: nextProfiles } =
+              await profilesService.getAllProfiles(i);
+            setProfiles((prevProfiles) => [...prevProfiles, ...nextProfiles]);
+          }
+        }
       } catch (error) {
         console.error("Failed to fetch profiles:", error);
       } finally {
@@ -109,15 +42,30 @@ export default function Home() {
     };
 
     fetchProfiles();
-  }, [currentPage]);
+  }, []);
 
-  const displayedProfiles = profiles
-    .filter((p) => !showOnlyVisible || p.Profile.isPhoneNumberVisible)
-    .filter(
-      (p) =>
-        !locationFilter ||
-        p.Profile.city?.toLowerCase().includes(locationFilter.toLowerCase())
-    );
+  useEffect(() => {
+    const startIndex = (currentPage - 1) * 20;
+    const endIndex = startIndex + 20;
+
+    const filteredProfiles = profiles
+      .filter((p) => !showOnlyVisible || p.Profile.isPhoneNumberVisible)
+      .filter((p) => {
+        if (!locationFilter) return true;
+        const searchText = locationFilter.toLowerCase();
+        return (
+          p.Profile.name.toLowerCase().includes(searchText) ||
+          p.Profile.city?.toLowerCase().includes(searchText) ||
+          p.Profile.profileId.toLowerCase().includes(searchText) ||
+          p.Profile.employment?.toLowerCase().includes(searchText) ||
+          p.Profile.raasi?.toLowerCase().includes(searchText) ||
+          p.Profile.star?.toLowerCase().includes(searchText)
+        );
+      })
+      .slice(startIndex, endIndex);
+
+    setDisplayedProfiles(filteredProfiles);
+  }, [currentPage, showOnlyVisible, locationFilter, profiles]);
 
   return (
     <main className="min-h-screen p-6 space-y-6 bg-[#F5F5F5]">
@@ -126,7 +74,7 @@ export default function Home() {
           <div className="flex items-center space-x-2 bg-blue-100 p-3 rounded">
             <Input
               type="text"
-              placeholder="Filter by location..."
+              placeholder="Search by name, location, ID, employment..."
               value={locationFilter}
               onChange={(e) => setLocationFilter(e.target.value)}
               className="max-w-xs"
